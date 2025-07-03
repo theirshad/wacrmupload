@@ -1,25 +1,48 @@
-// index.js
-const express = require("express");
-const cors = require("cors");
-const bodyParser = require("body-parser");
-const axios = require("axios");
-
+const express = require('express');
 const app = express();
-app.use(cors());
-app.use(bodyParser.json({ limit: '50mb' }));
+const axios = require('axios');
 
-app.post("/upload", async (req, res) => {
+// Accept large JSON payloads (base64 files can be big)
+app.use(express.json({ limit: '100mb' }));
+
+// Upload endpoint
+app.post('/upload', async (req, res) => {
+  const {
+    base64,
+    name,
+    mimeType,
+    user_unique_id,
+    user_fk_reseller_unique
+  } = req.body;
+
+  if (!base64 || !name || !mimeType) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
   try {
-    const response = await axios.post(
-      "https://reseller.digitalirshad.com/api/uploadv2.php",
-      req.body,
-      { headers: { "Content-Type": "application/json" } }
-    );
-    res.status(200).send(response.data);
-  } catch (error) {
-    console.error(error.response?.data || error.message);
-    res.status(500).send({ error: "Upload failed", details: error.message });
+    // Forward the upload to your PHP API
+    const response = await axios.post('https://reseller.digitalirshad.com/api/uploadv2.php', {
+      base64,
+      name,
+      mimeType,
+      user_unique_id,
+      user_fk_reseller_unique
+    });
+
+    // Send PHP API response back to frontend
+    res.json({ success: true, response: response.data });
+  } catch (err) {
+    console.error("Upload failed:", err.message);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      detail: err.response?.data || null
+    });
   }
 });
 
-app.listen(3000, () => console.log("Proxy running on port 3000"));
+// Start server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚀 Server listening on port ${PORT}`);
+});
